@@ -1,0 +1,16 @@
+{
+  "name": "baucua_socket_server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/socket.io": "^3.0.2",
+    "socket.io": "^4.6.1",
+    "uuid": "^9.0.0"
+  }
+}
