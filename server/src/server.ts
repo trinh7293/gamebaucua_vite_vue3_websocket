@@ -1,5 +1,5 @@
 import { Server } from "socket.io";
-const uuidv4 = require("uuid/v4");
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * TODO:
@@ -9,22 +9,24 @@ const uuidv4 = require("uuid/v4");
 
 const io = new Server({
   cors: {
-    origin: "http://localhost:8080",
+    origin: "http://localhost:5173",
   },
 });
 
-interface User {
-  id?: string;
+interface RegisterUser {
   avaSrc: string;
   name: string;
+}
+
+interface User extends RegisterUser {
+  id: string;
   /** if confirm bet amounts, user cannot
    * bet any more on that round */
   isConfirm: boolean;
-  animalBets?: {
-    // animal id: bet amount
-    [key: string]: number;
-  };
 }
+
+// {[userId]: {[animalId]: betamount}}
+type BetUser2animal = Record<string, Record<string, number>>;
 
 // user bet action
 interface UserBet {
@@ -41,62 +43,66 @@ interface Result {
 }
 
 // list user
-const users: User[] = [];
+// {[userId]: User}
+const users: Record<string, User> = {};
+// user bet result
+const betUser2animal: BetUser2animal = {};
 // result bet
 const result = {};
 // can accept new user
 let readyToGen = true;
 
 io.on("connection", (socket) => {
-  socket.on("userJoin", (newUser: User, callback) => {
+  socket.on("userJoin", (newUser: RegisterUser, callback) => {
+    console.log("userJoin received: ", JSON.stringify(newUser));
     if (!readyToGen) {
       callback({
-        isJoin: false,
+        status: "game is ready",
+        success: false,
       });
       return;
     }
     const userId: string = uuidv4();
-    users.push({
+    users[userId] = {
       ...newUser,
       id: userId,
-    });
+      isConfirm: false,
+    };
     callback({
-      users,
-      isJoin: true,
+      success: true,
+      userId,
     });
+    io.emit("userJoinSuccess", users);
   });
   socket.on("betAction", (userBet: UserBet, callback) => {
-    const { userId } = userBet;
-    const user = users.find((us) => us.id === userId);
-    if (!user) {
+    if (users[userBet.userId].isConfirm) {
       callback({
+        status: "user already confirm",
         success: false,
-        status: "cannot find user",
       });
       return;
     }
-    if (user.isConfirm) {
-      callback({
-        success: false,
-        status: "User is confirmed",
-      });
-      return;
+    if (!betUser2animal[userBet.userId]) {
+      betUser2animal[userBet.userId] = userBet.animalBets;
+    } else {
+      betUser2animal[userBet.userId] = {
+        ...betUser2animal[userBet.userId],
+        ...userBet.animalBets,
+      };
     }
-    user.animalBets = userBet.animalBets;
+    callback({
+      success: true,
+    });
   });
   socket.on("userConfirm", (userId: string, callback) => {
-    const user = users.find((us) => us.id === userId);
-    if (!user) {
-      callback({
-        success: false,
-        status: "cannot find user",
-      });
-      return;
-    }
-    user.isConfirm = true;
-    if (users.every((us) => us.isConfirm)) {
+    users[userId].isConfirm = true;
+    callback({
+      success: true,
+    });
+    // check if all players is confirmed
+    if (Object.values(users).every((us) => us.isConfirm)) {
       readyToGen = true;
-      socket.broadcast.emit("sendUserInfo", users);
+      io.emit("ready2Gen", betUser2animal);
     }
   });
 });

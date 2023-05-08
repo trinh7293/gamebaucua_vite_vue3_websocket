@@ -10,8 +10,10 @@ import store from '@/store';
 import type { NavigationGuardNext, Route } from 'vue-router';
 import type { Position, PositionResult } from 'vue-router/types/router';
 
-import HomeView from '@/views/HomeView.vue';
+// import HomeView from '@/views/HomeView.vue';
 import ErrorView from '@/views/ErrorView.vue';
+// eslint-disable-next-line import/default
+import MainGame from './components/MainGame.vue';
 
 // Vuetify
 import goTo from 'vuetify/lib/services/goto';
@@ -22,7 +24,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'Home',
-    component: HomeView,
+    component: MainGame,
   },
   {
     path: '/about',

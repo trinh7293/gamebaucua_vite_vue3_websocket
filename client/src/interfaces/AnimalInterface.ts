@@ -1,4 +1,4 @@
-export default interface AnimalItem {
+export interface AnimalItem {
   id: string;
   name: string;
   avaSrc: string;
