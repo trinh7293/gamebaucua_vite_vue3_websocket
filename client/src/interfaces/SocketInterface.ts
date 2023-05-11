@@ -1,6 +1,7 @@
 import type { BetAnimal2User, BetUser2Animal, User } from './UserInterface';
 
 export interface StateType {
+  isConfirm: boolean;
   isJoin: boolean;
   currentUserId: string | null;
   // {[userId]: <User>}

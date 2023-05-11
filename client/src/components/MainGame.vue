@@ -1,6 +1,36 @@
 <!-- eslint-disable vuejs-accessibility/anchor-has-content -->
 <template>
   <v-container class="text-center">
+    <v-dialog v-model="betDialog">
+      <v-card>
+        <!-- <v-card-title>
+          <span class="text-h5">Bet for {{ currentBetAnimal?.name }}</span>
+        </v-card-title> -->
+        <v-card-text>
+          <v-container>
+            <v-row>
+              <v-col cols="12">
+                <v-text-field
+                  v-model="bettingInfo.betAmount"
+                  type="number"
+                  label="Enter value here"
+                  required
+                />
+              </v-col>
+            </v-row>
+          </v-container>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="blue-darken-1" variant="text" @click="closeBetDialog">
+            Close
+          </v-btn>
+          <v-btn color="blue-darken-1" variant="text" @click="addBetItem">
+            Save
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <v-row v-if="!isJoin">
       <v-btn
         color="primary"
@@ -45,12 +75,24 @@
                   </v-list-item>
                 </v-list>
               </v-menu>
-              <v-btn @click="clickJoinGame">join game</v-btn>
+              <v-btn
+                @click="
+                  () => {
+                    joinGame(registerInfo);
+                  }
+                "
+              >
+                join game
+              </v-btn>
             </v-form>
           </v-sheet>
         </v-dialog>
       </v-btn>
     </v-row>
+    <v-row v-if="isJoin && !isConfirm">
+      <v-btn @click="confirmBet">Confirm Betting</v-btn>
+    </v-row>
+    <v-row v-if="isJoin && isConfirm">Confirmed</v-row>
     <v-row class="my-3">
       <!-- TODO click 2 open betting dialog, badge result -->
       <v-col
@@ -58,6 +100,11 @@
         :key="animal.id"
         cols="4"
         class="mb-5"
+        @click="
+          () => {
+            openBettingDialog(animal.id);
+          }
+        "
       >
         <v-badge :value="false">
           <v-img
@@ -96,7 +143,9 @@
             <v-badge
               v-for="animalId in Object.keys(betUser2Animal[userId] || {})"
               :key="animalId"
-              :content="betUser2Animal[userId][animalId]"
+              :content="
+                betUser2Animal[userId] && betUser2Animal[userId][animalId]
+              "
               inline
             >
               <v-list-item-avatar>
@@ -123,24 +172,21 @@
         </v-list>
       </v-col>
     </v-row>
-    <v-row>
-      <!-- {{ currentUserID }}
-      {{ JSON.stringify(betAnimal2User) }} -->
-    </v-row>
   </v-container>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue';
-import { state, joinGame } from '@/socket';
+import { state, joinGame, betAction, confirmBet } from '@/socket';
 // types
 import type { RegisterUser } from '@/interfaces/UserInterface';
 import { ANIMAL_DISPLAY, SAMPLE_AVA_SRCS } from '@/constants';
-
 /** HelloWorld Component */
 const users = computed(() => state.users);
 // the current user
-const currentUserID: string | null = null;
+// const currentUserId: string | null = null;
+const currentUserId = computed(() => state.currentUserId);
+const isConfirm = computed(() => state.isConfirm);
 // computed displays
 // bet results display
 const betUser2Animal = computed(() => state.betUser2Animal);
@@ -150,16 +196,44 @@ const registerInfo: RegisterUser = reactive({
   name: '',
   avaSrc: '',
 });
-
+// beting info for current player
+const betDialog = ref(false);
+const bettingInfo = reactive({
+  animalId: '',
+  betAmount: 0,
+});
+const closeBetDialog = () => {
+  bettingInfo.animalId = '';
+  bettingInfo.betAmount = 0;
+  betDialog.value = false;
+};
+// add bet item
+const addBetItem = () => {
+  betAction(bettingInfo.animalId, bettingInfo.betAmount);
+  betDialog.value = false;
+};
+const openBettingDialog = (animalId: string) => {
+  if (!isJoin.value) {
+    console.log('Plese join first');
+    return;
+  }
+  if (isConfirm.value) {
+    console.log('Bet result confirmed');
+    return;
+  }
+  betDialog.value = true;
+  bettingInfo.animalId = animalId;
+  if (betUser2Animal.value[currentUserId.value || '']) {
+    bettingInfo.betAmount =
+      betUser2Animal.value[currentUserId.value || ''][animalId] || 0;
+  }
+};
 const isJoin = computed(() => state.isJoin);
 const nameRules = [
   (v: string) => !!v || 'Name is required',
   (v: string) =>
     (v && v.length <= 10) || 'Name must be less than 10 characters',
 ];
-const clickJoinGame = () => {
-  joinGame(registerInfo);
-};
 </script>
 
 <style scoped>

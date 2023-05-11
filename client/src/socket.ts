@@ -13,7 +13,10 @@ import type {
   UserJoinRes,
 } from './interfaces/SocketInterface';
 
+import _ from 'lodash';
+
 export const state: StateType = reactive({
+  isConfirm: false,
   isJoin: false,
   currentUserId: null,
   users: null,
@@ -33,7 +36,13 @@ socket.on('ready2Gen', (betUser2animal: BetUser2Animal) => {
   state.betUser2Animal = betUser2animal;
   Object.entries(betUser2animal).forEach(([userId, aniBet]) => {
     Object.entries(aniBet).forEach(([animalId, betAmount]) => {
-      state.betAnimal2User[animalId][userId] = betAmount;
+      state.betAnimal2User = _.setWith(
+        { ...state.betAnimal2User },
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        `${animalId}.${userId}`,
+        betAmount
+      );
+      // state.betAnimal2User[animalId][userId] = betAmount;
     });
   });
 });
@@ -82,9 +91,16 @@ export const betAction = (animalId: string, betAmount: number): void => {
       console.log('!state.currentUserId');
       return;
     }
-    // set values for display
-    state.betUser2Animal[state.currentUserId][animalId] = betAmount;
-    state.betAnimal2User[animalId][state.currentUserId] = betAmount;
+    state.betUser2Animal = _.setWith(
+      { ...state.betUser2Animal },
+      `${state.currentUserId}.${animalId}`,
+      betAmount
+    );
+    state.betAnimal2User = _.setWith(
+      { ...state.betAnimal2User },
+      `${animalId}.${state.currentUserId}`,
+      betAmount
+    );
   });
 };
 
@@ -102,6 +118,6 @@ export const confirmBet = (): void => {
       console.log('!state.currentUserId');
       return;
     }
-    state.users && (state.users[state.currentUserId].isConfirm = true);
+    state.isConfirm = true;
   });
 };
