@@ -1,11 +1,6 @@
 import { Server } from "socket.io";
-import { v4 as uuidv4 } from "uuid";
-
-/**
- * TODO:
- * 1. gen result
- * 2. get result amount
- */
+import { ANIMAL_IDS, NUM_GEN } from "./constants";
+import _ from "lodash";
 
 const io = new Server({
   cors: {
@@ -23,20 +18,19 @@ interface User extends RegisterUser {
   /** if confirm bet amounts, user cannot
    * bet any more on that round */
   isConfirm: boolean;
+  balance: number;
+  betAnimal: BetUser2animal;
 }
 
-// {[userId]: {[animalId]: betamount}}
-type BetUser2animal = Record<string, Record<string, number>>;
+// {[animalId]: betamount}
+type BetUser2animal = Record<string, number>;
 
 // user bet action
-interface UserBet {
+export interface UserBet {
   userId: string;
-  animalBets: {
-    // animal id: bet amount
-    [key: string]: number;
-  };
+  animalId: string;
+  betAmount: number;
 }
-
 interface Result {
   // animalId: bet amount
   [key: string]: number;
@@ -45,17 +39,41 @@ interface Result {
 // list user
 // {[userId]: User}
 const users: Record<string, User> = {};
-// user bet result
-const betUser2animal: BetUser2animal = {};
 // result bet
-const result = {};
+let result: Record<string, number> = {};
 // can accept new user
-let readyToGen = true;
+let isBetting = true;
+
+const generateResult = () => {
+  result = generateRandomAnimal();
+  Object.entries(users).forEach(([userId, user]) => {
+    let winAmount = 0;
+    Object.entries(user.betAnimal).forEach(([animalId, betAmount]) => {
+      const animalWinAmount = (result[animalId] || -1) * betAmount;
+      winAmount += animalWinAmount;
+    });
+    users[userId].balance += winAmount;
+  });
+};
+
+const generateRandomAnimal = () => {
+  // generate new result
+  const newRe: Record<string, number> = {};
+  for (const _ of Array(NUM_GEN)) {
+    // generated result
+    const genRe = Math.floor(Math.random() * ANIMAL_IDS.length);
+    newRe[genRe] = (newRe[genRe] || 0) + 1;
+  }
+  return newRe;
+};
 
 io.on("connection", (socket) => {
+  const sendUserDatas = () => {
+    io.emit("listUsersData", users);
+  };
   socket.on("userJoin", (newUser: RegisterUser, callback) => {
     console.log("userJoin received: ", JSON.stringify(newUser));
-    if (!readyToGen) {
+    if (!isBetting) {
       callback({
         status: "game is ready",
         success: false,
@@ -67,43 +85,43 @@ io.on("connection", (socket) => {
       ...newUser,
       id: userId,
       isConfirm: false,
+      betAnimal: {},
+      balance: 0,
     };
     callback({
       success: true,
       userId,
     });
-    io.emit("listUsersData", users);
+    sendUserDatas();
   });
   socket.on("betAction", (userBet: UserBet, callback) => {
-    if (users[userBet.userId].isConfirm) {
+    const { userId, animalId, betAmount } = userBet;
+    const userBetting = users[userId];
+    if (userBetting.isConfirm) {
       callback({
         status: "user already confirm",
         success: false,
       });
       return;
     }
-    if (!betUser2animal[userBet.userId]) {
-      betUser2animal[userBet.userId] = userBet.animalBets;
-    } else {
-      betUser2animal[userBet.userId] = {
-        ...betUser2animal[userBet.userId],
-        ...userBet.animalBets,
-      };
-    }
+    // userBetting.betAnimal
+    _.setWith(userBetting, `betAnimal.${animalId}`, betAmount);
     callback({
       success: true,
     });
+    sendUserDatas();
   });
   socket.on("userConfirm", (userId: string, callback) => {
     users[userId].isConfirm = true;
     callback({
       success: true,
     });
-    io.emit("listUsersData", users);
+    sendUserDatas();
     // check if all players is confirmed
     if (Object.values(users).every((us) => us.isConfirm)) {
-      readyToGen = true;
-      io.emit("ready2Gen", betUser2animal);
+      isBetting = false;
+      generateResult();
+      io.emit("resultBet", result, users);
     }
   });
   socket.on("disconnecting", (reason) => {

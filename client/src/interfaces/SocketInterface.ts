@@ -1,21 +1,22 @@
-import type { BetAnimal2User, BetUser2Animal, User } from './UserInterface';
+import type { User } from './UserInterface';
 
 export interface StateType {
   isConfirm: boolean;
   isJoin: boolean;
   currentUserId: string | null;
   // {[userId]: <User>}
-  users: Record<string, User> | null;
-  betUser2Animal: BetUser2Animal;
-  betAnimal2User: BetAnimal2User;
-  readyToGen: boolean;
+  users: Record<string, User>;
+  isBetting: boolean;
+  resultBet: ResultBet;
 }
+
+export type ResultBet = Record<string, number>;
 
 // user bet action
 export interface UserBet {
   userId: string;
-  // animal id: bet amount
-  animalBets: Record<string, number>;
+  animalId: string;
+  betAmount: number;
 }
 
 export interface UserJoinRes {

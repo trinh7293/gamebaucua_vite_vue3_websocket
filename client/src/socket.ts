@@ -1,11 +1,8 @@
 import { reactive } from 'vue';
 import { io } from 'socket.io-client';
+import type { RegisterUser, User } from './interfaces/UserInterface';
 import type {
-  BetUser2Animal,
-  RegisterUser,
-  User,
-} from './interfaces/UserInterface';
-import type {
+  ResultBet,
   StateType,
   UserBet,
   UserBetRes,
@@ -13,16 +10,13 @@ import type {
   UserJoinRes,
 } from './interfaces/SocketInterface';
 
-import _ from 'lodash';
-
 export const state: StateType = reactive({
   isConfirm: false,
   isJoin: false,
   currentUserId: null,
-  users: null,
-  betUser2Animal: {},
-  betAnimal2User: {},
-  readyToGen: false,
+  users: {},
+  isBetting: true,
+  resultBet: {},
 });
 
 // "undefined" means the URL will be computed from the `window.location` object
@@ -30,22 +24,6 @@ export const state: StateType = reactive({
 const URL = 'http://localhost:3000';
 
 export const socket = io(URL);
-
-socket.on('ready2Gen', (betUser2animal: BetUser2Animal) => {
-  state.readyToGen = true;
-  state.betUser2Animal = betUser2animal;
-  Object.entries(betUser2animal).forEach(([userId, aniBet]) => {
-    Object.entries(aniBet).forEach(([animalId, betAmount]) => {
-      state.betAnimal2User = _.setWith(
-        { ...state.betAnimal2User },
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        `${animalId}.${userId}`,
-        betAmount
-      );
-      // state.betAnimal2User[animalId][userId] = betAmount;
-    });
-  });
-});
 
 socket.on('connect', () => {
   console.log('connected');
@@ -57,6 +35,12 @@ socket.on('disconnect', () => {
 
 socket.on('listUsersData', (users: Record<string, User>) => {
   console.log('listUsersData listener: ', JSON.stringify(users));
+  state.users = users;
+});
+
+socket.on('resultBet', (resultBet: ResultBet, users: Record<string, User>) => {
+  state.isBetting = false;
+  state.resultBet = resultBet;
   state.users = users;
 });
 
@@ -77,10 +61,10 @@ export const betAction = (animalId: string, betAmount: number): void => {
     console.log('!state.currentUserId');
     return;
   }
-  const animalBets = { [animalId]: betAmount };
   const userBet: UserBet = {
     userId: state.currentUserId,
-    animalBets,
+    animalId,
+    betAmount,
   };
   socket.emit('betAction', userBet, (res: UserBetRes) => {
     if (!res.success) {
@@ -89,18 +73,7 @@ export const betAction = (animalId: string, betAmount: number): void => {
     }
     if (!state.currentUserId) {
       console.log('!state.currentUserId');
-      return;
     }
-    state.betUser2Animal = _.setWith(
-      { ...state.betUser2Animal },
-      `${state.currentUserId}.${animalId}`,
-      betAmount
-    );
-    state.betAnimal2User = _.setWith(
-      { ...state.betAnimal2User },
-      `${animalId}.${state.currentUserId}`,
-      betAmount
-    );
   });
 };
 

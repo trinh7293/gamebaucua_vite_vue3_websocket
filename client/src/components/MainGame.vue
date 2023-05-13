@@ -106,7 +106,10 @@
           }
         "
       >
-        <v-badge :value="false">
+        <v-badge
+          :value="!!resultBet[animal.id]"
+          :content="resultBet[animal.id]"
+        >
           <v-img
             :src="animal.avaSrc"
             class="mx-auto logo vue"
@@ -134,6 +137,7 @@
               <v-list-item-title>
                 {{ users[userId].name }}
                 {{ users[userId].isConfirm ? 'Confirmed' : 'Choosing' }}
+                {{ users[userId].balance }}
               </v-list-item-title>
             </v-list-item-content>
 
@@ -142,11 +146,11 @@
               :key="animalId"
             > -->
             <v-badge
-              v-for="animalId in Object.keys(betUser2Animal[userId] || {})"
+              v-for="[animalId, betAmount] in _.toPairs(
+                users[userId].betAnimal
+              )"
               :key="animalId"
-              :content="
-                betUser2Animal[userId] && betUser2Animal[userId][animalId]
-              "
+              :content="betAmount"
               inline
             >
               <v-list-item-avatar>
@@ -180,8 +184,10 @@
 import { reactive, ref, computed } from 'vue';
 import { state, joinGame, betAction, confirmBet } from '@/socket';
 // types
-import type { RegisterUser } from '@/interfaces/UserInterface';
+import type { BetAnimal2User, RegisterUser } from '@/interfaces/UserInterface';
 import { ANIMAL_DISPLAY, SAMPLE_AVA_SRCS } from '@/constants';
+import type { ComputedRef } from 'vue';
+import _ from 'lodash';
 /** HelloWorld Component */
 const users = computed(() => state.users);
 // the current user
@@ -190,8 +196,16 @@ const currentUserId = computed(() => state.currentUserId);
 const isConfirm = computed(() => state.isConfirm);
 // computed displays
 // bet results display
-const betUser2Animal = computed(() => state.betUser2Animal);
-const betAnimal2User = computed(() => state.betAnimal2User);
+const betAnimal2User: ComputedRef<BetAnimal2User> = computed(() => {
+  const resu: BetAnimal2User = {};
+  _.toPairs(users.value).forEach(([userId, user]) => {
+    _.toPairs(user.betAnimal).forEach(([animalId, betAmount]) => {
+      _.setWith(resu, `${animalId}.${userId}`, betAmount);
+    });
+  });
+  return resu;
+});
+const resultBet = computed(() => state.resultBet);
 const registerDialog = ref(false);
 const registerInfo: RegisterUser = reactive({
   name: '',
@@ -224,10 +238,8 @@ const openBettingDialog = (animalId: string) => {
   }
   betDialog.value = true;
   bettingInfo.animalId = animalId;
-  if (betUser2Animal.value[currentUserId.value || '']) {
-    bettingInfo.betAmount =
-      betUser2Animal.value[currentUserId.value || ''][animalId] || 0;
-  }
+  bettingInfo.betAmount =
+    users.value[currentUserId.value || '']?.betAnimal[animalId] || 0;
 };
 const isJoin = computed(() => state.isJoin);
 const nameRules = [
