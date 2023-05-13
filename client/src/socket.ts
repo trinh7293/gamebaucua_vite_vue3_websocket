@@ -55,8 +55,8 @@ socket.on('disconnect', () => {
   console.log('disconnected');
 });
 
-socket.on('userJoinSuccess', (users: Record<string, User>) => {
-  console.log('userJoinSuccess listener: ', JSON.stringify(users));
+socket.on('listUsersData', (users: Record<string, User>) => {
+  console.log('listUsersData listener: ', JSON.stringify(users));
   state.users = users;
 });
 

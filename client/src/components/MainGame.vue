@@ -133,6 +133,7 @@
             <v-list-item-content>
               <v-list-item-title>
                 {{ users[userId].name }}
+                {{ users[userId].isConfirm ? 'Confirmed' : 'Choosing' }}
               </v-list-item-title>
             </v-list-item-content>
 

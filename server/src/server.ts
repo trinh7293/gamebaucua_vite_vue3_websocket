@@ -62,7 +62,7 @@ io.on("connection", (socket) => {
       });
       return;
     }
-    const userId: string = uuidv4();
+    const userId: string = socket.id;
     users[userId] = {
       ...newUser,
       id: userId,
@@ -72,7 +72,7 @@ io.on("connection", (socket) => {
       success: true,
       userId,
     });
-    io.emit("userJoinSuccess", users);
+    io.emit("listUsersData", users);
   });
   socket.on("betAction", (userBet: UserBet, callback) => {
     if (users[userBet.userId].isConfirm) {
@@ -99,11 +99,17 @@ io.on("connection", (socket) => {
     callback({
       success: true,
     });
+    io.emit("listUsersData", users);
     // check if all players is confirmed
     if (Object.values(users).every((us) => us.isConfirm)) {
       readyToGen = true;
       io.emit("ready2Gen", betUser2animal);
     }
+  });
+  socket.on("disconnecting", (reason) => {
+    console.log(`user ${socket.id} leave room`);
+    delete users[socket.id];
+    socket.broadcast.emit("listUsersData", users);
   });
 });
 
