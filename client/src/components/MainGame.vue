@@ -89,10 +89,17 @@
         </v-dialog>
       </v-btn>
     </v-row>
-    <v-row v-if="isJoin && !isConfirm">
+    <v-row v-if="isJoin && !isReady && !isResultGenerated">
       <v-btn @click="confirmBet">Confirm Betting</v-btn>
     </v-row>
-    <v-row v-if="isJoin && isConfirm">Confirmed</v-row>
+    <v-row v-if="isJoin && isReady">Confirmed</v-row>
+    <v-row v-if="isResultGenerated && isReady">
+      <v-btn @click="wantResetGame">Wanna reset game</v-btn>
+    </v-row>
+    <v-row v-if="isJoin && !isReady">
+      <p v-if="isResultGenerated">Waiting other players for new game</p>
+      <p v-else>Betting</p>
+    </v-row>
     <v-row class="my-3">
       <!-- TODO click 2 open betting dialog, badge result -->
       <v-col
@@ -136,7 +143,7 @@
             <v-list-item-content>
               <v-list-item-title>
                 {{ users[userId].name }}
-                {{ users[userId].isConfirm ? 'Confirmed' : 'Choosing' }}
+                {{ users[userId].isReady ? 'Confirmed' : 'Choosing' }}
                 {{ users[userId].balance }}
               </v-list-item-title>
             </v-list-item-content>
@@ -182,7 +189,13 @@
 
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue';
-import { state, joinGame, betAction, confirmBet } from '@/socket';
+import {
+  state,
+  joinGame,
+  betAction,
+  confirmBet,
+  wantResetGame,
+} from '@/socket';
 // types
 import type { BetAnimal2User, RegisterUser } from '@/interfaces/UserInterface';
 import { ANIMAL_DISPLAY, SAMPLE_AVA_SRCS } from '@/constants';
@@ -193,7 +206,10 @@ const users = computed(() => state.users);
 // the current user
 // const currentUserId: string | null = null;
 const currentUserId = computed(() => state.currentUserId);
-const isConfirm = computed(() => state.isConfirm);
+const isReady = computed(
+  () => users.value?.[currentUserId.value || '']?.isReady || false
+);
+const isResultGenerated = computed(() => state.isResultGenerated);
 // computed displays
 // bet results display
 const betAnimal2User: ComputedRef<BetAnimal2User> = computed(() => {
@@ -215,11 +231,11 @@ const registerInfo: RegisterUser = reactive({
 const betDialog = ref(false);
 const bettingInfo = reactive({
   animalId: '',
-  betAmount: 0,
+  betAmount: 1,
 });
 const closeBetDialog = () => {
   bettingInfo.animalId = '';
-  bettingInfo.betAmount = 0;
+  bettingInfo.betAmount = 1;
   betDialog.value = false;
 };
 // add bet item
@@ -232,14 +248,14 @@ const openBettingDialog = (animalId: string) => {
     console.log('Plese join first');
     return;
   }
-  if (isConfirm.value) {
+  if (isReady.value) {
     console.log('Bet result confirmed');
     return;
   }
   betDialog.value = true;
   bettingInfo.animalId = animalId;
   bettingInfo.betAmount =
-    users.value[currentUserId.value || '']?.betAnimal[animalId] || 0;
+    users.value[currentUserId.value || '']?.betAnimal[animalId] || 1;
 };
 const isJoin = computed(() => state.isJoin);
 const nameRules = [

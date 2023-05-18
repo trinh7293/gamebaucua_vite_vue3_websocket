@@ -17,7 +17,7 @@ interface User extends RegisterUser {
   id: string;
   /** if confirm bet amounts, user cannot
    * bet any more on that round */
-  isConfirm: boolean;
+  isReady: boolean;
   balance: number;
   betAnimal: BetUser2animal;
 }
@@ -40,9 +40,9 @@ interface Result {
 // {[userId]: User}
 const users: Record<string, User> = {};
 // result bet
-let result: Record<string, number> = {};
-// can accept new user
-let isBetting = true;
+let result: Result = {};
+// can not accept new user if true
+let isResultGenerated = false;
 
 const generateResult = () => {
   result = generateRandomAnimal();
@@ -58,7 +58,7 @@ const generateResult = () => {
 
 const generateRandomAnimal = () => {
   // generate new result
-  const newRe: Record<string, number> = {};
+  const newRe: Result = {};
   for (const _ of Array(NUM_GEN)) {
     // generated result
     const genRe = Math.floor(Math.random() * ANIMAL_IDS.length);
@@ -67,13 +67,29 @@ const generateRandomAnimal = () => {
   return newRe;
 };
 
+const resetGame = () => {
+  Object.values(users).forEach((user) => {
+    user.betAnimal = {};
+  });
+  result = {};
+  isResultGenerated = false;
+};
+
 io.on("connection", (socket) => {
   const sendUserDatas = () => {
     io.emit("listUsersData", users);
   };
+  socket.on("disconnecting", (reason) => {
+    console.log(`user ${socket.id} leave room`);
+    delete users[socket.id];
+    socket.broadcast.emit("listUsersData", users);
+    if (Object.keys(users).length === 0) {
+      resetGame();
+    }
+  });
   socket.on("userJoin", (newUser: RegisterUser, callback) => {
     console.log("userJoin received: ", JSON.stringify(newUser));
-    if (!isBetting) {
+    if (isResultGenerated) {
       callback({
         status: "game is ready",
         success: false,
@@ -84,7 +100,7 @@ io.on("connection", (socket) => {
     users[userId] = {
       ...newUser,
       id: userId,
-      isConfirm: false,
+      isReady: false,
       betAnimal: {},
       balance: 0,
     };
@@ -95,9 +111,10 @@ io.on("connection", (socket) => {
     sendUserDatas();
   });
   socket.on("betAction", (userBet: UserBet, callback) => {
+    console.log("bet action: ", JSON.stringify(userBet));
     const { userId, animalId, betAmount } = userBet;
     const userBetting = users[userId];
-    if (userBetting.isConfirm) {
+    if (userBetting.isReady) {
       callback({
         status: "user already confirm",
         success: false,
@@ -111,24 +128,52 @@ io.on("connection", (socket) => {
     });
     sendUserDatas();
   });
-  socket.on("userConfirm", (userId: string, callback) => {
-    users[userId].isConfirm = true;
+  socket.on("confirmAction", (userId: string, callback) => {
+    console.log(`user ${userId} wanna confirm bet`);
+    if (isResultGenerated) {
+      callback({
+        status: "not all player ready",
+        success: false,
+      });
+      return;
+    }
+    users[userId].isReady = true;
     callback({
       success: true,
     });
-    sendUserDatas();
     // check if all players is confirmed
-    if (Object.values(users).every((us) => us.isConfirm)) {
-      isBetting = false;
+    if (Object.values(users).every((us) => us.isReady)) {
       generateResult();
+      isResultGenerated = true;
       io.emit("resultBet", result, users);
+    } else {
+      sendUserDatas();
     }
   });
-  socket.on("disconnecting", (reason) => {
-    console.log(`user ${socket.id} leave room`);
-    delete users[socket.id];
-    socket.broadcast.emit("listUsersData", users);
+
+  socket.on("wannaResetAction", (userId: string, callback) => {
+    console.log(`user ${userId} wanna reset game`);
+    users[userId].isReady = false;
+    // if result not generated
+    if (!isResultGenerated) {
+      callback({
+        status: "Users are betting",
+        success: false,
+      });
+      return;
+    }
+    // if all other players already wanna reset game then reset game
+    if (Object.values(users).every((us) => !us.isReady)) {
+      // change state of server
+      resetGame();
+      // change other state
+      io.emit("resetGame");
+      // else change state of the user
+    } else {
+      sendUserDatas();
+    }
   });
 });
 
 io.listen(3000);
+// confirmAction

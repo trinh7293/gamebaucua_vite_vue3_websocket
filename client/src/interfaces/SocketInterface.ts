@@ -1,12 +1,11 @@
 import type { User } from './UserInterface';
 
 export interface StateType {
-  isConfirm: boolean;
   isJoin: boolean;
   currentUserId: string | null;
   // {[userId]: <User>}
   users: Record<string, User>;
-  isBetting: boolean;
+  isResultGenerated: boolean;
   resultBet: ResultBet;
 }
 
@@ -25,12 +24,7 @@ export interface UserJoinRes {
   userId?: string;
 }
 
-export interface UserBetRes {
-  success: boolean;
-  status: string;
-}
-
-export interface UserConfirmRes {
+export interface SocketRespone {
   success: boolean;
   status: string;
 }

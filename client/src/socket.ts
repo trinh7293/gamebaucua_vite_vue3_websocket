@@ -3,19 +3,17 @@ import { io } from 'socket.io-client';
 import type { RegisterUser, User } from './interfaces/UserInterface';
 import type {
   ResultBet,
+  SocketRespone,
   StateType,
   UserBet,
-  UserBetRes,
-  UserConfirmRes,
   UserJoinRes,
 } from './interfaces/SocketInterface';
 
 export const state: StateType = reactive({
-  isConfirm: false,
   isJoin: false,
   currentUserId: null,
   users: {},
-  isBetting: true,
+  isResultGenerated: false,
   resultBet: {},
 });
 
@@ -39,9 +37,20 @@ socket.on('listUsersData', (users: Record<string, User>) => {
 });
 
 socket.on('resultBet', (resultBet: ResultBet, users: Record<string, User>) => {
-  state.isBetting = false;
+  state.isResultGenerated = true;
   state.resultBet = resultBet;
   state.users = users;
+});
+
+socket.on('resetGame', () => {
+  state.isResultGenerated = false;
+  state.resultBet = {};
+  const newUsers = state.users;
+  Object.values(newUsers).forEach(user => {
+    user.betAnimal = {};
+    user.isReady = false;
+  });
+  state.users = { ...newUsers };
 });
 
 export const joinGame = (newUser: RegisterUser): void => {
@@ -66,7 +75,7 @@ export const betAction = (animalId: string, betAmount: number): void => {
     animalId,
     betAmount,
   };
-  socket.emit('betAction', userBet, (res: UserBetRes) => {
+  socket.emit('betAction', userBet, (res: SocketRespone) => {
     if (!res.success) {
       console.log(res.status);
       return;
@@ -82,15 +91,24 @@ export const confirmBet = (): void => {
     console.log('!state.currentUserId');
     return;
   }
-  socket.emit('userConfirm', state.currentUserId, (res: UserConfirmRes) => {
-    if (!res.success) {
-      console.log(res.status);
-      return;
-    }
+  socket.emit('confirmAction', state.currentUserId, (res: SocketRespone) => {
     if (!state.currentUserId) {
       console.log('!state.currentUserId');
-      return;
     }
-    state.isConfirm = true;
+    if (!res.success) {
+      console.log(res.status);
+    }
+  });
+};
+
+export const wantResetGame = (): void => {
+  if (!state.currentUserId) {
+    console.log('!state.currentUserId');
+    return;
+  }
+  socket.emit('wannaResetAction', state.currentUserId, (res: SocketRespone) => {
+    if (!res.success) {
+      console.log(res.status);
+    }
   });
 };
